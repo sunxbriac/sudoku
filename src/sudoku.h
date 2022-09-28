@@ -6,3 +6,12 @@
 #define REVISION    0
 
 #endif /* SUDOKU_H */
+
+#include <err.h>
+#include <getopt.h>
+#include <stdbool.h> 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+void print_help();
