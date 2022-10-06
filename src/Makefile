@@ -1,4 +1,4 @@
-CFLAGS = -std=c11 -Wall -Wextra -g
+CFLAGS = -std=c11 -Wall -Wextra -g -pedantic
 
 all : sudoku
 
