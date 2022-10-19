@@ -1,15 +1,20 @@
 EXE = sudoku
 
-all : 
+all : build
+
+build : 
 	@cd src && $(MAKE)
-	@mv src/sudoku sudoku
+	@cp src/$(EXE) $(EXE)
 
 clean : 
 	@cd src && $(MAKE) clean
 	@rm -f $(EXE)
-
+	@cd include && rm *.h.gch
 help : 
 	@echo "Usage : "
 	@echo "  make [all]\t\tCall source Make to build the software"
 	@echo "  make clean\t\tRemove all files and outdated software"
 	@echo "  make help\t\tDisplay this help"
+
+
+.PHONY : all build clean
