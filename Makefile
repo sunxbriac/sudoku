@@ -8,8 +8,8 @@ build :
 
 clean : 
 	@cd src && $(MAKE) clean
-	@rm -f $(EXE)
-	@cd include && rm *.h.gch
+	@rm -rf $(EXE)
+	@cd include && rm -rf *.h.gch
 help : 
 	@echo "Usage : "
 	@echo "  make [all]\t\tCall source Make to build the software"

@@ -1,8 +1,9 @@
 #include "colors.h"
 
 #include <stdio.h>
-#include <time.h>
 #include <unistd.h>
+
+#include <time.h>
 
 
 colors_t colors_full (const size_t size)
@@ -91,7 +92,7 @@ bool colors_is_subset (const colors_t colors1, const colors_t colors2)
 
 bool colors_is_singleton (const colors_t colors)
 {
-  if (colors_is_equal (colors, 0)) return false;
+  if(colors_is_equal (colors, 0)) return false;
   return colors_is_equal (colors_and (colors, colors - (colors_t)1), 0);
 }
 
@@ -118,14 +119,14 @@ size_t colors_count (const colors_t colors)
 
 colors_t colors_rightmost (const colors_t colors)
 {
-  if (colors_is_equal (colors, colors_empty())) return colors;
+  if(colors_is_equal (colors, colors_empty())) return colors;
   return colors_and (colors, -colors);
 }
 
 
 colors_t colors_leftmost (const colors_t colors)
 {
-  if (colors_is_singleton (colors)) return colors_rightmost(colors);
+  if(colors_is_singleton (colors)) return colors_rightmost(colors);
   
   colors_t temp_colors = colors_or (colors, colors >> 1);
   temp_colors = colors_or (temp_colors, temp_colors >> 2);
@@ -135,7 +136,7 @@ colors_t colors_leftmost (const colors_t colors)
   temp_colors = colors_or (temp_colors, temp_colors >> 32);
   temp_colors++;
 
-  if (colors_is_equal (temp_colors,0)) return colors_set(MAX_COLORS - 1);
+  if(colors_is_equal (temp_colors,0)) return colors_set(MAX_COLORS - 1);
   return (colors_rightmost (temp_colors) >> 1);
 }
 
@@ -146,8 +147,13 @@ colors_t colors_random (const colors_t colors)
   colors_t colors_copy = colors;
   colors_t colors_res = colors_rightmost (colors_copy);
 
-  srand (time (NULL));
-  int rand_id = rand() %colors_count(colors);
+  static bool seeded = false;
+  if(!seeded) {
+    srand (time (NULL));
+    seeded = true;
+  }
+  
+  int rand_id = rand() %colors_count (colors);
   int i = 1;
 
   while(i < rand_id)
@@ -161,13 +167,176 @@ colors_t colors_random (const colors_t colors)
 }
 
 
+bool subgrid_consistency(colors_t subgrid[], const size_t size)
+{
+  colors_t single = colors_empty();
+  size_t single_count = 0;
+  colors_t full = colors_empty();
+
+  for(size_t i = 0; i < size; i++)
+  {
+    if(colors_is_equal (subgrid[i],colors_empty())) 
+      return false;
+    if(colors_is_singleton (subgrid[i])) 
+    {
+      single = colors_or (single,subgrid[i]);
+      single_count++;
+    }
+    full = colors_or (full,subgrid[i]);
+  }
+
+  if(single_count != colors_count (single)) return false;
+  return (colors_is_equal (full, colors_full(size)));
+}
 
 
+bool subgrid_heuristics(colors_t *subgrid[], size_t size)
+{
+  bool change = false;
+
+  // cross-hatching 
+
+  for(size_t i = 0; i < size; i++)
+  {
+    if(colors_is_singleton (*subgrid[i]))
+    {
+      for(size_t j = 0; j < size; j++)
+      {
+        colors_t temp_colors = *subgrid[j] & ~*subgrid[i];
+        if((*subgrid[j] ^ temp_colors) != 0 && i != j)
+      {
+        change = true;
+        *subgrid[j] = temp_colors;
+      }
+      }
+    }
+  }
+  
+  // lone number 
+
+  colors_t colors_in_multi = colors_empty();
+  colors_t colors_in = colors_empty();
+  
+  for(size_t i = 0; i < size; i++)
+  {
+    colors_t colors_alrdy_in = colors_in & *subgrid[i];
+    colors_in_multi = colors_alrdy_in | colors_in_multi;
+    colors_in = colors_in | *subgrid[i];
+  }
+  
+  if(!colors_is_equal (colors_full(size), colors_in_multi))
+  {
+    colors_t colors_single = ~colors_in_multi;
+
+    for(size_t i = 0; i < size; i++)
+    {
+      colors_t colors_tmp = colors_single & *subgrid[i];
+      if(!colors_is_singleton (*subgrid[i]) && 
+          ((colors_tmp) != 0))
+      {
+        *subgrid[i] = colors_tmp;
+        change = true;
+      }
+    }
+  }
+
+  // naked-subset
+  
+  for(size_t i = 0; i < size; i++)
+  {
+    colors_t subset = *subgrid[i];
+    if(!colors_is_singleton (subset))
+    {
+      size_t count = colors_count (subset);
+      size_t n = 0;
+
+      for(size_t j = 0; j < size; j++)
+        if(colors_is_subset (*subgrid[j], subset))
+          n++;
+
+      if(n == count)
+      {
+        for(size_t j = 0; j < size; j++)
+        {
+          if(!colors_is_subset (*subgrid[j], subset))
+          {
+            colors_t colors_tmp = *subgrid[j] & ~subset;
+            if(!colors_is_equal (colors_tmp, *subgrid[j]))
+            {
+              change = true;
+              *subgrid[j] = colors_tmp;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // hidden-subset not functional
+
+/*
+  colors_t *colors_index = NULL;
+  colors_index = malloc(size * sizeof(colors_t));
+  if(colors_index == NULL) return false;
+
+  for(size_t i = 0; i < size; i++)  
+    colors_index[i] = colors_empty();
 
 
+  for(size_t i = 0; i < size; i ++)
+    for(size_t j = 0; j < size; j++)
+      if(colors_is_in (*subgrid[i], j))
+        colors_add (colors_index[j], i);
+  
 
 
+  for(size_t i = 0; i < size; i++)
+  {
+    for(size_t j = 0; j < size; j++)
+    {
+      colors_t uni = colors_index[i] | colors_index[j];
+      size_t count = colors_count (uni);
+      size_t n = 0;
 
+      size_t *included_index = NULL;
+      included_index = malloc (size * sizeof(size_t));
+      if(included_index == NULL) 
+        return false;
 
+      for(size_t k = 0; k < size; k++)
+      {
+        if(colors_is_subset (colors_index[k], uni))
+        {
+          included_index[n] = k;
+          n++;
+        }
+      }
 
+      if(n == count)
+      {
+        colors_t hidden_subset = colors_empty();
 
+        for(size_t l = 0; l < count; l++)
+          colors_add(hidden_subset, included_index[l]);
+
+        for(size_t k = 0; k < size; k++)
+        {
+          if(colors_is_in (uni, k) && 
+            !colors_is_equal ((hidden_subset & *subgrid[k]), *subgrid[k]))
+            {
+            printf("going in hidden\n");
+            change = true;
+            *subgrid[k] = hidden_subset;
+            }
+        }
+      }
+
+      free (included_index);
+    }
+  }
+
+  free (colors_index);
+  */
+  
+  return change;
+}
