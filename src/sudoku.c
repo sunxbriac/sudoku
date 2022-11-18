@@ -202,20 +202,16 @@ static grid_t *grid_solver(grid_t *grid, FILE *fd, mode_t mode)
     return NULL;
   
   size_t end_of_heuristics = grid_heuristics(grid);
-  //grid_print(grid,fd);
   choice_t *choice;
   grid_t *copy;
-  //grid_print(grid,fd);
 
   switch(end_of_heuristics)
   {
     case 2:
-      //fprintf(fd,"Grid is inconsistent !\n\n");
       grid_free(grid);
       return NULL;
 
     case 1: 
-      //fprintf(fd,"Grid is solved !\n\n");
       if(mode == mode_all) 
       {
         solutions++;
@@ -246,7 +242,6 @@ static grid_t *grid_solver(grid_t *grid, FILE *fd, mode_t mode)
   }
 
   grid_choice_apply(copy,choice);
-  //grid_choice_print(choice,fd);
   copy = grid_solver(copy,fd,mode);
 
   if(mode == mode_first)
@@ -363,7 +358,7 @@ int main(int argc, char* argv[])
   if(output_file)
   {
     file = fopen(output_file,"w");
-    if(file == NULL)    // no such file in directory
+    if(file == NULL)  
       errx(EXIT_FAILURE, "error : can't create file");  
   }
 
