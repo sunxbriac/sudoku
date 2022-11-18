@@ -1,3 +1,6 @@
+#ifndef COLORS_H
+#define COLORS_H
+
 #define MAX_COLORS 64
 
 #include <stdbool.h>
@@ -65,3 +68,5 @@ bool subgrid_consistency(colors_t subgrid[], const size_t size);
 
 /* applies heuristics on given subgrid */
 bool subgrid_heuristics(colors_t *subgrid[], size_t size);
+
+#endif /* COLORS_H*/

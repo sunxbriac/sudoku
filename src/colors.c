@@ -189,7 +189,6 @@ bool subgrid_consistency(colors_t subgrid[], const size_t size)
   return (colors_is_equal (full, colors_full(size)));
 }
 
-
 bool subgrid_heuristics(colors_t *subgrid[], size_t size)
 {
   bool change = false;
@@ -213,7 +212,7 @@ bool subgrid_heuristics(colors_t *subgrid[], size_t size)
   }
   
   // lone number 
-
+  
   colors_t colors_in_multi = colors_empty();
   colors_t colors_in = colors_empty();
   
@@ -232,14 +231,14 @@ bool subgrid_heuristics(colors_t *subgrid[], size_t size)
     {
       colors_t colors_tmp = colors_single & *subgrid[i];
       if(!colors_is_singleton (*subgrid[i]) && 
-          ((colors_tmp) != 0))
+          ((colors_tmp) != 0) && colors_tmp != *subgrid[i])
       {
         *subgrid[i] = colors_tmp;
         change = true;
       }
     }
   }
-
+  
   // naked-subset
   
   for(size_t i = 0; i < size; i++)
@@ -254,89 +253,70 @@ bool subgrid_heuristics(colors_t *subgrid[], size_t size)
         if(colors_is_subset (*subgrid[j], subset))
           n++;
 
-      if(n == count)
+      if(n != count)
+        continue;
+      
+      for(size_t j = 0; j < size; j++)
       {
-        for(size_t j = 0; j < size; j++)
+        if(!colors_is_subset (*subgrid[j], subset))
         {
-          if(!colors_is_subset (*subgrid[j], subset))
+          colors_t colors_tmp = *subgrid[j] & ~subset;
+          if(!colors_is_equal (colors_tmp, *subgrid[j]))
           {
-            colors_t colors_tmp = *subgrid[j] & ~subset;
-            if(!colors_is_equal (colors_tmp, *subgrid[j]))
-            {
-              change = true;
-              *subgrid[j] = colors_tmp;
-            }
+            change = true;
+            *subgrid[j] = colors_tmp;
           }
         }
       }
     }
   }
 
-  // hidden-subset not functional
-
-/*
-  colors_t *colors_index = NULL;
-  colors_index = malloc(size * sizeof(colors_t));
-  if(colors_index == NULL) return false;
+  // hidden-subset
+  
+  colors_t colors_index[MAX_COLORS];
 
   for(size_t i = 0; i < size; i++)  
     colors_index[i] = colors_empty();
 
-
   for(size_t i = 0; i < size; i ++)
     for(size_t j = 0; j < size; j++)
       if(colors_is_in (*subgrid[i], j))
-        colors_add (colors_index[j], i);
+        colors_index[j] = colors_index[j] | colors_set(i);
   
-
 
   for(size_t i = 0; i < size; i++)
   {
+    size_t count = colors_count (colors_index[i]);
+    size_t n = 0;
+    size_t included_index[MAX_COLORS];
+
     for(size_t j = 0; j < size; j++)
     {
-      colors_t uni = colors_index[i] | colors_index[j];
-      size_t count = colors_count (uni);
-      size_t n = 0;
-
-      size_t *included_index = NULL;
-      included_index = malloc (size * sizeof(size_t));
-      if(included_index == NULL) 
-        return false;
-
-      for(size_t k = 0; k < size; k++)
+      if(colors_is_subset (colors_index[j], colors_index[i]))
       {
-        if(colors_is_subset (colors_index[k], uni))
+        included_index[n] = j;
+        n++;
+      }
+    }
+
+    if(n == count && n > 1)
+    {
+      colors_t hidden_subset = colors_empty();
+
+      for(size_t j = 0; j < count; j++)
+        hidden_subset = hidden_subset | colors_set(included_index[j]);
+
+      for(size_t j = 0; j < size; j++)
+      {
+        if(colors_is_in(colors_index[i], j) && 
+          !colors_is_equal((hidden_subset & *subgrid[j]), *subgrid[j]))
         {
-          included_index[n] = k;
-          n++;
+          change = true;
+          *subgrid[j] = hidden_subset & *subgrid[j];
         }
       }
-
-      if(n == count)
-      {
-        colors_t hidden_subset = colors_empty();
-
-        for(size_t l = 0; l < count; l++)
-          colors_add(hidden_subset, included_index[l]);
-
-        for(size_t k = 0; k < size; k++)
-        {
-          if(colors_is_in (uni, k) && 
-            !colors_is_equal ((hidden_subset & *subgrid[k]), *subgrid[k]))
-            {
-            printf("going in hidden\n");
-            change = true;
-            *subgrid[k] = hidden_subset;
-            }
-        }
-      }
-
-      free (included_index);
     }
   }
-
-  free (colors_index);
-  */
   
   return change;
 }

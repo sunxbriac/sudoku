@@ -10,9 +10,11 @@
 
 #include <grid.h>
 
-
+typedef enum { mode_first, mode_all } mode_t;
 
 static bool verbose = false; 
+static size_t solutions;
+static bool solved;
 
 
 static grid_t *file_parser(char *filename)
@@ -194,6 +196,81 @@ static void print_help()
          " -h,--help              display this help and exit\n");
 }
 
+static grid_t *grid_solver(grid_t *grid, FILE *fd, mode_t mode)
+{
+  if(grid == NULL)
+    return NULL;
+  
+  size_t end_of_heuristics = grid_heuristics(grid);
+  //grid_print(grid,fd);
+  choice_t *choice;
+  grid_t *copy;
+  //grid_print(grid,fd);
+
+  switch(end_of_heuristics)
+  {
+    case 2:
+      //fprintf(fd,"Grid is inconsistent !\n\n");
+      grid_free(grid);
+      return NULL;
+
+    case 1: 
+      //fprintf(fd,"Grid is solved !\n\n");
+      if(mode == mode_all) 
+      {
+        solutions++;
+        fprintf(fd,"solution #%ld:\n",solutions);
+      }
+      solved = true;
+      grid_print(grid,fd);
+      return grid;
+    
+    default:
+      copy = grid_copy(grid);
+      if(copy == NULL)
+      {
+        fprintf(fd,"erreur copy");
+        grid_free(grid);
+        return NULL;
+      }
+
+      choice = grid_choice(grid);
+      if(choice == NULL)
+      {
+        fprintf(fd,"erreur choice");
+        grid_free(grid);
+        grid_free(copy);
+        return NULL;
+      }
+      break;
+  }
+
+  grid_choice_apply(copy,choice);
+  //grid_choice_print(choice,fd);
+  copy = grid_solver(copy,fd,mode);
+
+  if(mode == mode_first)
+  {
+    if(copy)
+    {
+      grid_choice_free(choice);
+      grid_free(grid);
+      return copy;
+    }
+
+    grid_choice_discard(grid,choice);
+    grid_free(copy);
+    grid_choice_free(choice);
+    return grid_solver(grid,fd,mode);
+  }
+
+  // mode_all ->
+  grid_choice_discard(grid,choice);
+  grid_free(copy);
+  grid_choice_free(choice);
+  return grid_solver(grid,fd,mode);
+}
+
 int main(int argc, char* argv[])
 {
 
@@ -209,11 +286,13 @@ int main(int argc, char* argv[])
     {NULL,        0,                  NULL,  0 }
   };
 
+  mode_t mode = mode_first;
   bool all = false;
   bool unique = false;
   bool generator = false;       // true = generator , false = solver
   bool inconsistency = false; 
   FILE* file = stdout;
+  char* output_file = NULL;
   size_t size = DEFAULT_SIZE;
 
 
@@ -230,6 +309,7 @@ int main(int argc, char* argv[])
       generator = false;
     }
     all = true;
+    mode = mode_all;
     break;
 
   case 'g':
@@ -253,12 +333,10 @@ int main(int argc, char* argv[])
     break;
 
   case 'o':
-    if(optarg == NULL) errx(EXIT_FAILURE,"error : no output file given");
+    if(optarg == NULL) 
+      errx(EXIT_FAILURE,"error : no output file given");
 
-    file = fopen(optarg,"w");
-    if(file == NULL)    // no such file in directory
-      errx(EXIT_FAILURE, "error : can't create file");  
-    fclose(file);
+    output_file = optarg;
     break;
 
   case 'v':
@@ -282,6 +360,13 @@ int main(int argc, char* argv[])
     errx(EXIT_FAILURE, "error: invalid option '%s'!", argv[optind - 1]);
   }
 
+  if(output_file)
+  {
+    file = fopen(output_file,"w");
+    if(file == NULL)    // no such file in directory
+      errx(EXIT_FAILURE, "error : can't create file");  
+  }
+
   if(!generator){
     if(optind == argc) errx(EXIT_FAILURE,"error : no grid given");
 
@@ -300,7 +385,7 @@ int main(int argc, char* argv[])
   
   if(!generator){
     
-    bool inconsistency = false;
+    inconsistency = false;
     if(optind == argc) errx(EXIT_FAILURE,"error : no grid given");
 
     for(int i = optind; i < argc; i++)   
@@ -314,14 +399,28 @@ int main(int argc, char* argv[])
         inconsistency = true;
         warnx("Grid %s is inconsistent !\n", argv[i]);
       }
-      else 
-        grid_heuristics(grid);
 
-      grid_print(grid,file);
+      else 
+      {
+        solved = false;
+        solutions = 0;
+        grid = grid_solver(grid,file,mode);
+        
+        if(solved)
+        {
+          printf("The grid is solved!\n\n");
+          if(mode == mode_all)
+            fprintf(file,"number of solutions : %ld\n",solutions);
+        }
+        else
+          printf("The grid hasn't been solved!\nThe grid is inconsistent\n\n");
+        
+        inconsistency |= !solved;
+      }
       grid_free(grid);
     }
   }
-  
+
   if(generator)
   {
     grid_t *grid = grid_alloc(size);
@@ -329,12 +428,15 @@ int main(int argc, char* argv[])
     grid_free(grid);
   }
 
-  if(file != NULL) fclose(file);
+  if(file != stdout) 
+  {
+    fclose(file);
+  }
 
   if(!generator && inconsistency)
-    return EXIT_FAILURE;
+    errx(EXIT_FAILURE,"error: one of the given grids is inconsistent");
+
   return EXIT_SUCCESS;
- 
 }
 
 

@@ -12,6 +12,40 @@ struct _grid_t
   colors_t **cells;
 };
 
+struct choice_t 
+{
+  size_t row;
+  size_t column;
+  colors_t color;
+};
+
+
+static size_t square_root(size_t size)
+{
+  switch (size)
+  {
+  case 1:
+    return 1;
+  case 4:
+    return 2;
+  case 9:
+    return 3;
+  case 16:
+    return 4;
+  case 25:
+    return 5;
+  case 36:
+    return 6;
+  case 49:
+    return 7;
+  case 64:
+    return 8;
+
+  default:
+    return 0;
+  }
+}
+
 bool grid_check_char(const grid_t *grid, const char c)
 {
   if(grid == NULL) return false;
@@ -64,10 +98,15 @@ void grid_free(grid_t *grid)
   free(grid);
 }
 
-
 void grid_print(const grid_t *grid, FILE *fd)
 {
   if(grid == NULL) return;
+
+/* We search for the biggest string to print in the grid to make it 
+ * more readable when we are using big sized grids */
+
+  char *c_grid[MAX_GRID_SIZE][MAX_GRID_SIZE];
+  size_t max = 0;
 
   for(size_t i = 0; i  < grid->size; i++)
   {
@@ -77,20 +116,36 @@ void grid_print(const grid_t *grid, FILE *fd)
       if(c == NULL) 
         return;
 
+      c_grid[i][j] = c;
+
+      size_t m = 0;
+      while((m < grid->size) && (c[m] != '\0')) m++;
+      if(m < grid->size) max = (m > max)? m : max;
+    }
+  }
+
+  
+  for(size_t i = 0; i  < grid->size; i++)
+  {
+    for(size_t j = 0; j < grid->size ; j++)
+    {
       size_t n = 0;
-      while((n < grid->size) && (c[n] == color_table[n])) n++;
+      while((n < grid->size) && (c_grid[i][j][n] != '\0')) n++;
 
       if(n == grid->size)
       {
-        fprintf(fd, "%c ", EMPTY_CELL);
+        fprintf(fd, "%c ", (n == 1)?'1':EMPTY_CELL);
       }
       else
-        fprintf(fd, "%s ", c); 
+        fprintf(fd, "%s ", c_grid[i][j]); 
       
-      free(c);
+      for(size_t k = 0; k+n < max; k++)
+        fprintf(fd," ");
       
+      free(c_grid[i][j]);
     }
     fprintf(fd, "\n");
+    
   }
 
   fprintf(fd,"\n");
@@ -120,23 +175,19 @@ grid_t *grid_copy(const grid_t *grid)
   return grid_copy;
 }
 
-char *grid_get_cell(const grid_t *grid, const size_t row, const size_t column)
+static char *colors_to_string(const colors_t colors)
 {
-  if(grid == 0 || row >= grid-> size || column >= grid->size) return NULL;
-
-  colors_t cell = grid->cells[row][column];
-  size_t count = colors_count(cell);
+  size_t count = colors_count(colors);
 
   char *cell_str = malloc ((count + 1) * sizeof(char));
   if(cell_str == NULL) 
     return NULL;
   
-  
   size_t i = 0;
   size_t color_id = 0;
-  while (i < count )
+  while (i < count)
   {
-    if(colors_is_in(cell,color_id))
+    if(colors_is_in(colors,color_id))
     {
       cell_str[i] = color_table[color_id];
       i++;
@@ -146,6 +197,14 @@ char *grid_get_cell(const grid_t *grid, const size_t row, const size_t column)
   
   cell_str[i] = '\0';
   return cell_str;
+}
+
+char *grid_get_cell(const grid_t *grid, const size_t row, const size_t column)
+{
+  if(grid == 0 || row >= grid-> size || column >= grid->size) return NULL;
+
+  colors_t cell = grid->cells[row][column];
+  return colors_to_string(cell);
 }
 
 size_t grid_get_size(const grid_t *grid)
@@ -179,81 +238,37 @@ bool grid_is_solved(grid_t *grid)
 bool grid_is_consistent(grid_t *grid)
 {
   
-  // lines subgrids 
+  // lines and column subgrids 
 
-  colors_t **lines = NULL;
-  lines = malloc (grid->size * sizeof(colors_t*));
-  if(lines == NULL) 
-    goto error;
+  colors_t lines[MAX_GRID_SIZE][MAX_GRID_SIZE];
+  colors_t columns[MAX_GRID_SIZE][MAX_GRID_SIZE];
   
   for(size_t i = 0; i < grid->size ; i++)
   {
-    colors_t *subgrid = NULL;
-    subgrid = malloc (grid->size * sizeof(colors_t));
-    if(subgrid == NULL) 
-      goto error;
-    
     for(size_t j = 0; j < grid->size; j++)
-      subgrid[j] = grid->cells[i][j];
-
-    lines[i] = subgrid;
-  }
-
-  // columns subgrids 
-
-  colors_t **columns = NULL;
-  columns = malloc (grid->size * sizeof(colors_t*));
-  if(columns == NULL) 
-    goto error;
-
-  for(size_t j = 0; j < grid->size ; j++)
-  {
-    colors_t *subgrid = NULL;
-    subgrid = malloc (grid->size * sizeof(colors_t));
-    if(subgrid == NULL) 
-      goto error;
-    
-    for(size_t i = 0; i < grid->size; i++)
-      subgrid[i] = grid->cells[i][j]; 
-
-    columns[j] = subgrid;
-  }
-
-  // square root calculation
-  
-  float sqrt = (grid->size == 1)? 1 : grid->size / 2;
-  float tmp = 0;
-  while(sqrt != tmp)
-  {
-    tmp = sqrt;
-    sqrt = (grid->size / tmp + tmp) / 2;
+    {
+      lines[i][j] = grid->cells[i][j];
+      columns[i][j] = grid->cells[j][i];
+    }
   }
   
   // blocks subgrids 
 
-  colors_t **blocks = NULL;
-  blocks = malloc (grid->size * sizeof(colors_t*));
-  if(blocks == NULL) 
-    goto error;
+  size_t sqrt = square_root(grid->size);
+  colors_t blocks[MAX_GRID_SIZE][MAX_GRID_SIZE];
 
   int n = 0;
-  
-  for(size_t i = 0; i < (size_t)sqrt; i++ )
+  for(size_t i = 0; i < sqrt; i++ )
   {
-    for(size_t j = 0; j < (size_t)sqrt; j++)
+    for(size_t j = 0; j < sqrt; j++)
     {
-      colors_t *subgrid = NULL;
-      subgrid = malloc (grid->size * sizeof(colors_t));
-      if(subgrid == NULL) 
-        goto error;
-
       int m = 0;
 
-      for(size_t k = 0; k < (size_t)sqrt; k++)
-        for(size_t l = 0; l < (size_t)sqrt; l++)
-          subgrid[m++] = grid->cells[i*(size_t)sqrt +k][ j*(size_t)sqrt+l];
-
-      blocks[n++] = subgrid;
+      for(size_t k = 0; k < sqrt; k++)
+        for(size_t l = 0; l < sqrt; l++)
+          blocks[n][m++] = grid->cells[i*sqrt + k][j*sqrt + l];
+      
+      n++;     
     }
   }
 
@@ -263,113 +278,47 @@ bool grid_is_consistent(grid_t *grid)
     if(!subgrid_consistency(lines[i],grid->size) ||
         !subgrid_consistency(columns[i],grid->size) ||
           !subgrid_consistency(blocks[i],grid->size))
-    {
-    error :
-
-      for(size_t i = 0; i < grid->size; i++)
-      {
-        free(lines[i]);
-        free(columns[i]);
-        free(blocks[i]);
-      }
-      free(lines);
-      free(columns);
-      free(blocks);
       return false;
-    }
+  }
 
-  }
-  for(size_t i = 0; i < grid->size; i++)
-  {
-    free(lines[i]);
-    free(columns[i]);
-    free(blocks[i]);
-  }
-  free(lines);
-  free(columns);
-  free(blocks);
   return true;
 }
 
 size_t grid_heuristics(grid_t *grid)
 {
   bool keep_going = true;
+// lines and column subgrids 
 
-// lines subgrids 
-
-  colors_t ***lines = NULL;
-  lines = malloc (grid->size * sizeof(colors_t**));
-  if(lines == NULL) 
-    goto error;
+  colors_t *lines[MAX_GRID_SIZE][MAX_GRID_SIZE];
+  colors_t *columns[MAX_GRID_SIZE][MAX_GRID_SIZE];
 
   for(size_t i = 0; i < grid->size; i++)
     {
-      colors_t **subgrid = NULL;
-      subgrid = malloc (grid->size * sizeof(colors_t*));
-      if(subgrid == NULL) 
-        goto error;
-      
       for(size_t j = 0; j < grid->size; j++)
-        subgrid[j] = &grid->cells[i][j];
-      
-      lines[i] = subgrid;
+      {
+        lines[i][j] = &grid->cells[i][j];
+        columns[i][j] = &grid->cells[j][i];
+      }
     }
-  
-  // columns subgrids 
-
-  colors_t ***columns = NULL;
-  columns = malloc (grid->size * sizeof(colors_t**));
-  if(columns == NULL) 
-    goto error;
-
-  for(size_t j = 0; j < grid->size ; j++)
-  {
-    colors_t **subgrid = NULL;
-    subgrid = malloc (grid->size * sizeof(colors_t*));
-    if(subgrid == NULL) 
-      goto error;
-
-    for(size_t i = 0; i < grid->size; i++)
-      subgrid[i] = &grid->cells[i][j]; 
-
-    columns[j] = subgrid;
-  }
-  
-  // square root calculation
-  
-  float sqrt = (grid->size == 1)? 1 : grid->size / 2;
-  float tmp = 0;
-  while(sqrt != tmp)
-  {
-    tmp = sqrt;
-    sqrt = (grid->size / tmp + tmp) / 2;
-  }
 
   // blocks subgrids 
 
-  colors_t ***blocks = NULL;
-  blocks = malloc (grid->size * sizeof(colors_t**));
-  if(blocks == NULL) 
-    goto error;
+  size_t sqrt = square_root(grid->size);
+  colors_t *blocks[MAX_GRID_SIZE][MAX_GRID_SIZE];
 
-  int n = 0;
+  size_t n = 0;
   
-  for(size_t i = 0; i < (size_t)sqrt; i++ )
+  for(size_t i = 0; i < sqrt; i++ )
   {
-    for(size_t j = 0; j < (size_t)sqrt; j++)
+    for(size_t j = 0; j < sqrt; j++)
     {
-      colors_t **subgrid = NULL;
-      subgrid = malloc (grid->size * sizeof(colors_t*));
-      if(subgrid == NULL) 
-        goto error;
-
-      int m = 0;
+      size_t m = 0;
 
       for(size_t k = 0; k < (size_t)sqrt; k++)
         for(size_t l = 0; l < (size_t)sqrt; l++)
-          subgrid[m++] = &grid->cells[i*(size_t)sqrt +k][ j*(size_t)sqrt+l];
+          blocks[n][m++] = &grid->cells[i*sqrt +k][ j*sqrt+l];
 
-      blocks[n++] = subgrid;
+      n++;
     }
   }
 
@@ -381,24 +330,81 @@ size_t grid_heuristics(grid_t *grid)
       bool keep_tmp = subgrid_heuristics(lines[i],grid->size) |
       subgrid_heuristics(columns[i],grid->size) |
       subgrid_heuristics(blocks[i],grid->size);
-      keep_going = keep_tmp || keep_going;
+      keep_going |= keep_tmp;
     }
-
+    
     if(!grid_is_consistent(grid) || grid_is_solved(grid)) keep_going = false;
   }
 
-  error: 
-  
-  for(size_t i = 0; i < grid->size; i++)
-  {
-    free(lines[i]);
-    free(columns[i]);
-    free(blocks[i]);
-  }
-
-  free(lines);
-  free(columns);
-  free(blocks);
 
   return (grid_is_consistent(grid))? ((grid_is_solved(grid))? 1 : 0) : 2;
+}
+
+void grid_choice_free(choice_t *choice)
+{
+  if(choice == NULL) return;
+  free(choice);
+}
+
+bool grid_choice_is_empty(const choice_t *choice)
+{
+  return (choice->color == colors_empty());
+}
+
+void grid_choice_apply(grid_t *grid, const choice_t *choice)
+{
+  grid->cells[choice->row][choice->column] = choice->color;
+}
+
+void grid_choice_blank(grid_t *grid, const choice_t *choice)
+{
+  grid->cells[choice->row][choice->column] = colors_full(grid->size);
+}
+
+void grid_choice_discard(grid_t *grid, const choice_t *choice)
+{
+  grid->cells[choice->row][choice->column] &= ~choice->color;
+}
+
+void grid_choice_print(const choice_t *choice, FILE *fd)
+{
+  char *c = colors_to_string(choice->color);
+  if(c == NULL) 
+    return;
+  
+  fprintf(fd, "Next choice at grid[%ld][%ld] ",choice->row,choice->column);
+  fprintf(fd, "is '%s'.\n",c);
+
+  free(c);
+}
+
+choice_t *grid_choice(grid_t *grid) 
+{
+  size_t min = grid->size;
+  size_t min_row;
+  size_t min_col;
+
+  for(size_t i = 0; i < grid->size; i++)
+  {
+    for(size_t j = 0; j < grid->size; j++)
+    {
+      size_t count = colors_count(grid->cells[i][j]);
+      if((count < min) && (count > 1))
+      {
+        min = count;
+        min_row = i;
+        min_col = j;
+      }
+    }
+  }
+
+  if(min == grid->size) 
+    return NULL;
+
+  choice_t *choice = malloc(sizeof(choice_t));
+  choice->row = min_row;
+  choice->column = min_col;
+  choice->color = colors_rightmost(grid->cells[min_row][min_col]);
+
+  return choice;
 }

@@ -1,4 +1,4 @@
-CFLAGS = -std=c11 -Wall -Wextra -g3 -pedantic
+CFLAGS = -std=c11 -Wall -Wextra -pedantic
 CPPFLAGS = -I../include -DEBUG
 LDFLAGS =
 EXE = sudoku
