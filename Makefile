@@ -17,7 +17,8 @@ help :
 	@echo "  make help\t\tDisplay this help"
 
 
-report : pdflatex report/report.tex 
+report : 
+	@pdflatex report/report.tex 
 
 
 .PHONY : all build report clean
