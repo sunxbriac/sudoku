@@ -1,4 +1,4 @@
-CFLAGS = -std=c11 -Wall -Wextra -pedantic
+CFLAGS = -std=c11 -Wall -Wextra -pedantic -O3
 CPPFLAGS = -I../include -DEBUG
 LDFLAGS =
 EXE = sudoku
@@ -8,7 +8,7 @@ all : sudoku
 test : colors_tests grid_tests
 
 sudoku : sudoku.o grid.o colors.o
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $^ 
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o  $@ $^ 
 
 sudoku.o : sudoku.c sudoku.h ../include/grid.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $^

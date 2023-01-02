@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include <time.h>
 
 
 colors_t colors_full (const size_t size)
@@ -146,12 +145,6 @@ colors_t colors_random (const colors_t colors)
   if(colors == 0) return 0;
   colors_t colors_copy = colors;
   colors_t colors_res = colors_rightmost (colors_copy);
-
-  static bool seeded = false;
-  if(!seeded) {
-    srand (time (NULL));
-    seeded = true;
-  }
   
   int rand_id = rand() %colors_count (colors);
   int i = 1;
@@ -165,7 +158,6 @@ colors_t colors_random (const colors_t colors)
   
   return colors_res;
 }
-
 
 bool subgrid_consistency(colors_t subgrid[], const size_t size)
 {
@@ -189,11 +181,9 @@ bool subgrid_consistency(colors_t subgrid[], const size_t size)
   return (colors_is_equal (full, colors_full(size)));
 }
 
-bool subgrid_heuristics(colors_t *subgrid[], size_t size)
+bool cross_hatching_heuristics(colors_t *subgrid[], size_t size)
 {
   bool change = false;
-
-  // cross-hatching 
 
   for(size_t i = 0; i < size; i++)
   {
@@ -210,9 +200,14 @@ bool subgrid_heuristics(colors_t *subgrid[], size_t size)
       }
     }
   }
-  
-  // lone number 
-  
+
+  return change;
+}
+
+bool lone_number_heuristics(colors_t *subgrid[], size_t size)
+{
+  bool change = false;
+
   colors_t colors_in_multi = colors_empty();
   colors_t colors_in = colors_empty();
   
@@ -238,9 +233,15 @@ bool subgrid_heuristics(colors_t *subgrid[], size_t size)
       }
     }
   }
-  
-  // naked-subset
-  
+
+  return change;
+}
+
+
+bool naked_subset_heuristics(colors_t *subgrid[], size_t size)
+{
+  bool change = false;
+
   for(size_t i = 0; i < size; i++)
   {
     colors_t subset = *subgrid[i];
@@ -271,8 +272,14 @@ bool subgrid_heuristics(colors_t *subgrid[], size_t size)
     }
   }
 
-  // hidden-subset
-  
+  return change;
+}
+
+
+bool hidden_subset_heuristics(colors_t *subgrid[], size_t size)
+{
+  bool change = false;
+
   colors_t colors_index[MAX_COLORS];
 
   for(size_t i = 0; i < size; i++)  
@@ -317,6 +324,6 @@ bool subgrid_heuristics(colors_t *subgrid[], size_t size)
       }
     }
   }
-  
+
   return change;
 }

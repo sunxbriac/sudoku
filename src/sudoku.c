@@ -7,6 +7,7 @@
 
 #include <err.h>
 #include <getopt.h>
+#include <time.h>
 
 #include <grid.h>
 
@@ -15,7 +16,10 @@ typedef enum { mode_first, mode_all } mode_t;
 static bool verbose = false; 
 static size_t solutions;
 static bool solved;
+static size_t choices;
+static size_t backtracks;
 
+static bool seeded = false;
 
 static grid_t *file_parser(char *filename)
 {
@@ -196,10 +200,13 @@ static void print_help()
          " -h,--help              display this help and exit\n");
 }
 
-static grid_t *grid_solver(grid_t *grid, FILE *fd, mode_t mode)
+static grid_t *grid_solver(grid_t *grid, FILE *fd, mode_t mode, bool generator)
 {
   if(grid == NULL)
+  {
+    backtracks++;
     return NULL;
+  }
   
   size_t end_of_heuristics = grid_heuristics(grid);
   choice_t *choice;
@@ -212,13 +219,18 @@ static grid_t *grid_solver(grid_t *grid, FILE *fd, mode_t mode)
       return NULL;
 
     case 1: 
+      if(!generator) fprintf(fd,"\n# solution ");
+
       if(mode == mode_all) 
       {
         solutions++;
-        fprintf(fd,"solution #%ld:\n",solutions);
+        if(!generator) fprintf(fd,"#%ld:",solutions);
+        else if(solutions > 1) return NULL;
       }
+
+      fprintf(fd,"\n");
       solved = true;
-      grid_print(grid,fd);
+      if(!generator) grid_print(grid,fd);
       return grid;
     
     default:
@@ -242,7 +254,8 @@ static grid_t *grid_solver(grid_t *grid, FILE *fd, mode_t mode)
   }
 
   grid_choice_apply(copy,choice);
-  copy = grid_solver(copy,fd,mode);
+  choices++;
+  copy = grid_solver(copy,fd,mode,generator);
 
   if(mode == mode_first)
   {
@@ -256,14 +269,15 @@ static grid_t *grid_solver(grid_t *grid, FILE *fd, mode_t mode)
     grid_choice_discard(grid,choice);
     grid_free(copy);
     grid_choice_free(choice);
-    return grid_solver(grid,fd,mode);
+    return grid_solver(grid,fd,mode,generator);
   }
 
   // mode_all ->
   grid_choice_discard(grid,choice);
   grid_free(copy);
   grid_choice_free(choice);
-  return grid_solver(grid,fd,mode);
+  if(generator && (solutions > 1)) return NULL;
+  return grid_solver(grid,fd,mode,generator);
 }
 
 int main(int argc, char* argv[])
@@ -282,7 +296,6 @@ int main(int argc, char* argv[])
   };
 
   mode_t mode = mode_first;
-  bool all = false;
   bool unique = false;
   bool generator = false;       // true = generator , false = solver
   bool inconsistency = false; 
@@ -303,7 +316,6 @@ int main(int argc, char* argv[])
         "it!");
       generator = false;
     }
-    all = true;
     mode = mode_all;
     break;
 
@@ -321,7 +333,7 @@ int main(int argc, char* argv[])
   case 'u':
     if(!generator)
     {
-      warnx("warning: option all conflicts with generator mode, disabling it!");
+      warnx("warning: option unique conflicts with solver mode, disabling it!");
       generator = false;
     }
     unique = true;
@@ -377,7 +389,7 @@ int main(int argc, char* argv[])
     }
   }
   
-  
+
   if(!generator){
     
     inconsistency = false;
@@ -387,7 +399,11 @@ int main(int argc, char* argv[])
     {                       
       grid_t *grid = file_parser(argv[i]);
       if(grid == NULL) errx(EXIT_FAILURE,"error: error with file %s", argv[i]);
-      grid_print(grid,file);
+      if(verbose) 
+      {
+        fprintf(file,"# input grid : \n");
+        grid_print(grid,file);
+      }
 
       if(!grid_is_consistent(grid))
       {
@@ -397,15 +413,28 @@ int main(int argc, char* argv[])
 
       else 
       {
+        if(!seeded) 
+        {
+        srand (time (NULL));
+        seeded = true;
+        }
+
         solved = false;
         solutions = 0;
-        grid = grid_solver(grid,file,mode);
+        choices = 0;
+        backtracks = 0;
+        grid = grid_solver(grid,file,mode,generator);
         
         if(solved)
         {
-          printf("The grid is solved!\n\n");
+          printf("# The grid is solved!\n\n");
           if(mode == mode_all)
-            fprintf(file,"number of solutions : %ld\n",solutions);
+            fprintf(file,"# Number of solutions: %ld\n",solutions);
+          if(verbose)
+          {
+            fprintf(file,"# Number of choices: %ld\n",choices);
+            fprintf(file,"# Number of backtracks: %ld\n",backtracks);
+          }
         }
         else
           printf("The grid hasn't been solved!\nThe grid is inconsistent\n\n");
@@ -416,9 +445,71 @@ int main(int argc, char* argv[])
     }
   }
 
+
   if(generator)
   {
+    if(!seeded) 
+      {
+      srand (time (NULL));
+      seeded = true;
+      }
+
     grid_t *grid = grid_alloc(size);
+    grid_set_empty(grid);   
+
+    size_t square_size = size * size;
+    size_t sku_tab[square_size];
+    for(size_t i = 0; i < square_size; i++)
+        sku_tab[i] = i;
+
+    bool generated = false;
+    while(!generated)
+    {
+      mode = mode_first;
+      grid = grid_solver(grid,file,mode,generator); 
+
+      size_t j;
+      size_t temp;
+      for(size_t i = 0; i < square_size; i++)
+      {
+        j = i + rand() % (square_size - i);
+        temp = sku_tab[i];
+        sku_tab[i] = sku_tab[j];
+        sku_tab[j] = temp;
+      }
+
+      size_t row;
+      size_t col;
+      size_t removed = 0;
+      size_t i = 0;
+      if(unique) mode = mode_all;
+
+      while(((removed*100)/square_size < 40) && (i < square_size))
+      {
+        row = sku_tab[i] / size;
+        col = sku_tab[i] % size;
+        if(!unique)
+        {
+          grid_set_cell(grid,row,col,EMPTY_CELL);
+          removed++;
+        }
+        else
+        {
+          solutions = 0;
+          grid_t *temp_grid = grid_copy(grid);
+          grid_set_cell(temp_grid,row,col,EMPTY_CELL);
+          grid_solver(temp_grid,file,mode,generator);
+          if(solutions == 1)
+          {
+            grid_set_cell(grid,row,col,EMPTY_CELL);
+            removed++;
+          }
+        }
+        i++;
+      }
+      generated = !(i == square_size);
+    }
+
     grid_print(grid,file);
     grid_free(grid);
   }
@@ -433,6 +524,4 @@ int main(int argc, char* argv[])
 
   return EXIT_SUCCESS;
 }
-
-
 

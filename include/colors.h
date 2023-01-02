@@ -66,7 +66,16 @@ colors_t colors_random (const colors_t colors);
 /* checks if a subgrid is consistent */
 bool subgrid_consistency(colors_t subgrid[], const size_t size);
 
-/* applies heuristics on given subgrid */
-bool subgrid_heuristics(colors_t *subgrid[], size_t size);
+/* applies the cross-hatching heuristics to the subgrid */
+bool cross_hatching_heuristics(colors_t *subgrid[], size_t size);
+
+/* applies the lone number heuristics to the subgrid */
+bool lone_number_heuristics(colors_t *subgrid[], size_t size);
+
+/* applies the naked-subset heuristics to the subgrid */
+bool naked_subset_heuristics(colors_t *subgrid[], size_t size);
+
+/* applies the hidden-subset heuristics to the subgrid */
+bool hidden_subset_heuristics(colors_t *subgrid[], size_t size);
 
 #endif /* COLORS_H*/

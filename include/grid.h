@@ -77,6 +77,9 @@ void grid_choice_print(const choice_t *choice, FILE *fd);
 
 /* chooses the smallest set of colors in all the grid 
    and select the rightmost color */
-choice_t *grid_choice(grid_t *grid) ;
+choice_t *grid_choice(grid_t *grid);
+
+/* sets every color of the grid to empty */
+void grid_set_empty(grid_t *grid);
 
 #endif /* GRID_H */

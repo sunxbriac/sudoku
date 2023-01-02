@@ -215,15 +215,19 @@ size_t grid_get_size(const grid_t *grid)
 void grid_set_cell(grid_t *grid, const size_t row, const size_t column,
  const char color)
 {
-  if(grid == NULL || row >= grid-> size || column >= grid->size) return;
+  if(grid == NULL || row >= grid-> size || column >= grid->size) 
+    return;
   
-  size_t i = 0;
-  while((color != color_table[i]) && (i < grid->size)) i++;
+  if(color == EMPTY_CELL)
+  {
+    grid->cells[row][column] = colors_full(grid->size);
+    return;
+  }
 
-  if(i < grid->size)
-    grid->cells[row][column] = colors_set(i);
-  else 
-    grid->cells[row][column] = colors_full(i);
+  size_t i = 0;
+  while(color != color_table[i]) i++;
+
+  grid->cells[row][column] = colors_set(i);
 }
 
 
@@ -325,6 +329,68 @@ size_t grid_heuristics(grid_t *grid)
   while(keep_going)
   {
     keep_going = false;
+    bool useful = true;
+
+    while(useful)
+    {
+      for(size_t i = 0; i < grid->size; i++)
+    {
+      useful = cross_hatching_heuristics(lines[i],grid->size) |
+      cross_hatching_heuristics(columns[i],grid->size) |
+      cross_hatching_heuristics(blocks[i],grid->size);
+      keep_going |= useful;
+    }
+
+    if(!grid_is_consistent(grid) || grid_is_solved(grid))
+      goto get_out;
+    }
+
+    useful = true;
+    while(useful)
+    {
+      for(size_t i = 0; i < grid->size; i++)
+    {
+      useful = lone_number_heuristics(lines[i],grid->size) |
+      lone_number_heuristics(columns[i],grid->size) |
+      lone_number_heuristics(blocks[i],grid->size);
+      keep_going |= useful;
+    }
+
+    if(!grid_is_consistent(grid) || grid_is_solved(grid))
+      goto get_out;
+    }
+
+    useful = true;
+    while(useful)
+    {
+      for(size_t i = 0; i < grid->size; i++)
+    {
+      useful = naked_subset_heuristics(lines[i],grid->size) |
+      naked_subset_heuristics(columns[i],grid->size) |
+      naked_subset_heuristics(blocks[i],grid->size);
+      keep_going |= useful;
+    }
+
+    if(!grid_is_consistent(grid) || grid_is_solved(grid))
+      goto get_out;
+    }
+
+    useful = true;
+    while(useful)
+    {
+      for(size_t i = 0; i < grid->size; i++)
+    {
+      useful = hidden_subset_heuristics(lines[i],grid->size) |
+      hidden_subset_heuristics(columns[i],grid->size) |
+      hidden_subset_heuristics(blocks[i],grid->size);
+      keep_going |= useful;
+    }
+
+    if(!grid_is_consistent(grid) || grid_is_solved(grid))
+      goto get_out;
+    }
+
+    /*
     for(size_t i = 0; i < grid->size; i++)
     {
       bool keep_tmp = subgrid_heuristics(lines[i],grid->size) |
@@ -334,8 +400,10 @@ size_t grid_heuristics(grid_t *grid)
     }
     
     if(!grid_is_consistent(grid) || grid_is_solved(grid)) keep_going = false;
+    */
   }
 
+  get_out:
 
   return (grid_is_consistent(grid))? ((grid_is_solved(grid))? 1 : 0) : 2;
 }
@@ -380,7 +448,7 @@ void grid_choice_print(const choice_t *choice, FILE *fd)
 
 choice_t *grid_choice(grid_t *grid) 
 {
-  size_t min = grid->size;
+  size_t min = grid->size + 1;
   size_t min_row;
   size_t min_col;
 
@@ -398,13 +466,25 @@ choice_t *grid_choice(grid_t *grid)
     }
   }
 
+/*
+  colors_t color_choice;
   if(min == grid->size) 
-    return NULL;
-
+    color_choice = colors_random(colors_full(grid->size));
+  else 
+    color_choice = colors_rightmost(grid->cells[min_row][min_col]);
+*/
   choice_t *choice = malloc(sizeof(choice_t));
   choice->row = min_row;
   choice->column = min_col;
-  choice->color = colors_rightmost(grid->cells[min_row][min_col]);
+  choice->color = colors_random(grid->cells[min_row][min_col]);
 
   return choice;
+}
+
+
+void grid_set_empty(grid_t *grid)
+{
+  for(size_t i = 0; i < grid->size; i++)
+    for(size_t j = 0; j < grid->size; j++)
+      grid_set_cell(grid,i,j,EMPTY_CELL);
 }
