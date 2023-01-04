@@ -462,7 +462,7 @@ int main(int argc, char* argv[])
     for(size_t i = 0; i < square_size; i++)
         sku_tab[i] = i;
 
-    bool generated = false;
+    bool generated = (size == 1)? true: false;
     while(!generated)
     {
       mode = mode_first;

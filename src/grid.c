@@ -389,18 +389,6 @@ size_t grid_heuristics(grid_t *grid)
     if(!grid_is_consistent(grid) || grid_is_solved(grid))
       goto get_out;
     }
-
-    /*
-    for(size_t i = 0; i < grid->size; i++)
-    {
-      bool keep_tmp = subgrid_heuristics(lines[i],grid->size) |
-      subgrid_heuristics(columns[i],grid->size) |
-      subgrid_heuristics(blocks[i],grid->size);
-      keep_going |= keep_tmp;
-    }
-    
-    if(!grid_is_consistent(grid) || grid_is_solved(grid)) keep_going = false;
-    */
   }
 
   get_out:
@@ -466,13 +454,6 @@ choice_t *grid_choice(grid_t *grid)
     }
   }
 
-/*
-  colors_t color_choice;
-  if(min == grid->size) 
-    color_choice = colors_random(colors_full(grid->size));
-  else 
-    color_choice = colors_rightmost(grid->cells[min_row][min_col]);
-*/
   choice_t *choice = malloc(sizeof(choice_t));
   choice->row = min_row;
   choice->column = min_col;
